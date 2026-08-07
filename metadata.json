@@ -1,0 +1,6 @@
+{
+  "name": "365 Tao Daily Meditations",
+  "description": "An app dedicated to Taoist daily meditations. Features daily verses, deep commentaries, serene background customization (music and images), and dynamic reflections powered by AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
