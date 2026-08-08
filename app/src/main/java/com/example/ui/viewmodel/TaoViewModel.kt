@@ -69,6 +69,17 @@ class TaoViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
+    // Journal entries list (saved user thoughts)
+    val journalEntries: StateFlow<List<TaoMeditation>> = repository.getJournalEntries()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    private val _saveMessage = MutableStateFlow<String?>(null)
+    val saveMessage: StateFlow<String?> = _saveMessage.asStateFlow()
+
     init {
         // Collect and sync settings when VM starts
         viewModelScope.launch {
@@ -130,7 +141,28 @@ class TaoViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val updated = currentMeditation.copy(userNote = note)
             repository.updateMeditation(updated)
+            _saveMessage.value = if (note.isBlank()) {
+                "Journal thought cleared for Day ${currentMeditation.day}"
+            } else {
+                "Journal thought saved for Day ${currentMeditation.day}"
+            }
         }
+    }
+
+    fun saveNoteForDay(meditation: TaoMeditation, newNote: String) {
+        viewModelScope.launch {
+            val updated = meditation.copy(userNote = newNote)
+            repository.updateMeditation(updated)
+            _saveMessage.value = if (newNote.isBlank()) {
+                "Entry deleted for Day ${meditation.day}"
+            } else {
+                "Entry updated for Day ${meditation.day}"
+            }
+        }
+    }
+
+    fun clearSaveMessage() {
+        _saveMessage.value = null
     }
 
     fun forceRefreshMeditation() {

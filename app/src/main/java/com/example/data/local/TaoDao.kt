@@ -18,6 +18,9 @@ interface TaoDao {
     @Query("SELECT * FROM meditations WHERE isFavorite = 1 ORDER BY day ASC")
     fun getFavorites(): Flow<List<TaoMeditation>>
 
+    @Query("SELECT * FROM meditations WHERE userNote IS NOT NULL AND userNote != '' ORDER BY day ASC")
+    fun getJournalEntries(): Flow<List<TaoMeditation>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMeditation(meditation: TaoMeditation)
 

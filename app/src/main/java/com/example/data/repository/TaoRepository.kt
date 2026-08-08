@@ -80,6 +80,11 @@ class TaoRepository(
         return taoDao.getFavorites()
     }
 
+    // Get all meditations with saved journal thoughts
+    fun getJournalEntries(): Flow<List<TaoMeditation>> {
+        return taoDao.getJournalEntries()
+    }
+
     // Reactively merge the 365-day master list with database-saved states
     fun getAll365Meditations(): Flow<List<TaoMeditation>> {
         return taoDao.getAllMeditations().map { dbList ->

@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -12,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.rememberScrollState
@@ -26,7 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -54,15 +59,26 @@ fun HomeScreen(viewModel: TaoViewModel) {
     val settings by viewModel.userSettings.collectAsState()
     val isLoading by viewModel.isLoadingMeditation.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val journalEntries by viewModel.journalEntries.collectAsState()
+    val saveMessage by viewModel.saveMessage.collectAsState()
 
     val completedCount = remember(allMeditations) { allMeditations.count { it.isCompleted } }
 
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(saveMessage) {
+        saveMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearSaveMessage()
+        }
+    }
 
     var showDayPickerSheet by remember { mutableStateOf(false) }
     var showCustomizerSheet by remember { mutableStateOf(false) }
-    var showJournalSection by remember { mutableStateOf(false) }
+    var showJournalSheet by remember { mutableStateOf(false) }
+    var showJournalSection by remember { mutableStateOf(true) }
 
     // File pickers
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -88,6 +104,7 @@ fun HomeScreen(viewModel: TaoViewModel) {
         // 2. Main Scaffold Layout
         Scaffold(
             containerColor = Color.Transparent,
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
                 CenterAlignedTopAppBar(
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -198,21 +215,34 @@ fun HomeScreen(viewModel: TaoViewModel) {
 
                     // Journal Item
                     NavigationBarItem(
-                        selected = showJournalSection,
-                        onClick = { showJournalSection = !showJournalSection },
+                        selected = showJournalSheet,
+                        onClick = { showJournalSheet = true },
                         icon = {
-                            Icon(
-                                imageVector = Icons.Default.EditNote,
-                                contentDescription = "Journal",
-                                tint = if (showJournalSection) Color(0xFF141F07) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                            )
+                            BadgedBox(
+                                badge = {
+                                    if (journalEntries.isNotEmpty()) {
+                                        Badge(
+                                            containerColor = ZenPrimary,
+                                            contentColor = ZenOnPrimary
+                                        ) {
+                                            Text("${journalEntries.size}")
+                                        }
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.EditNote,
+                                    contentDescription = "Journal",
+                                    tint = if (showJournalSheet) Color(0xFF141F07) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                )
+                            }
                         },
                         label = {
                             Text(
                                 "Journal",
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Medium,
-                                    color = if (showJournalSection) Color(0xFF141F07) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                                    color = if (showJournalSheet) Color(0xFF141F07) else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                                 )
                             )
                         },
@@ -543,6 +573,14 @@ fun HomeScreen(viewModel: TaoViewModel) {
                             item {
                                 var noteText by remember(meditation.day) { mutableStateOf(meditation.userNote) }
 
+                                val promptSuggestions = remember {
+                                    listOf(
+                                        "How can I practice non-striving (Wu Wei) today?",
+                                        "What quiet truth resonated from today's verse?",
+                                        "Where in my life can I flow like water?"
+                                    )
+                                }
+
                                 Card(
                                     colors = CardDefaults.cardColors(
                                         containerColor = Color(0xFFF2EFE5)
@@ -556,14 +594,92 @@ fun HomeScreen(viewModel: TaoViewModel) {
                                             .fillMaxWidth()
                                             .padding(20.dp)
                                     ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Default.EditNote,
+                                                    contentDescription = null,
+                                                    tint = ZenPrimary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "Personal Reflection",
+                                                    style = MaterialTheme.typography.titleMedium.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontFamily = FontFamily.Serif,
+                                                        color = ZenPrimary
+                                                    )
+                                                )
+                                            }
+
+                                            if (journalEntries.isNotEmpty()) {
+                                                TextButton(
+                                                    onClick = { showJournalSheet = true },
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.MenuBook,
+                                                        contentDescription = null,
+                                                        tint = ZenPrimary,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = "Journal Log (${journalEntries.size})",
+                                                        style = MaterialTheme.typography.labelMedium.copy(
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = ZenPrimary
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(10.dp))
+
+                                        // Inspiration prompt chips
                                         Text(
-                                            text = "My Personal Reflections",
-                                            style = MaterialTheme.typography.titleSmall.copy(
+                                            text = "REFLECTION PROMPTS",
+                                            style = MaterialTheme.typography.labelSmall.copy(
                                                 fontWeight = FontWeight.Bold,
-                                                color = ZenPrimary
+                                                letterSpacing = 1.sp,
+                                                color = ZenSecondary
                                             ),
-                                            modifier = Modifier.padding(bottom = 8.dp)
+                                            modifier = Modifier.padding(bottom = 6.dp)
                                         )
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .horizontalScroll(rememberScrollState()),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            promptSuggestions.forEach { prompt ->
+                                                SuggestionChip(
+                                                    onClick = {
+                                                        noteText = if (noteText.isBlank()) prompt else "$noteText\n$prompt"
+                                                    },
+                                                    label = {
+                                                        Text(
+                                                            prompt,
+                                                            fontSize = 12.sp,
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                    },
+                                                    border = BorderStroke(1.dp, ZenBorder),
+                                                    colors = SuggestionChipDefaults.suggestionChipColors(
+                                                        containerColor = Color.White.copy(alpha = 0.8f)
+                                                    )
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(12.dp))
 
                                         OutlinedTextField(
                                             value = noteText,
@@ -577,7 +693,7 @@ fun HomeScreen(viewModel: TaoViewModel) {
                                             },
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(110.dp)
+                                                .height(120.dp)
                                                 .testTag("journal_input"),
                                             colors = OutlinedTextFieldDefaults.colors(
                                                 focusedTextColor = MaterialTheme.colorScheme.onBackground,
@@ -585,7 +701,7 @@ fun HomeScreen(viewModel: TaoViewModel) {
                                                 focusedBorderColor = ZenPrimary,
                                                 unfocusedBorderColor = ZenBorder,
                                                 focusedContainerColor = Color.White,
-                                                unfocusedContainerColor = Color.White.copy(alpha = 0.6f)
+                                                unfocusedContainerColor = Color.White.copy(alpha = 0.7f)
                                             ),
                                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                                             keyboardActions = KeyboardActions(onDone = {
@@ -596,27 +712,58 @@ fun HomeScreen(viewModel: TaoViewModel) {
 
                                         Spacer(modifier = Modifier.height(12.dp))
 
-                                        Button(
-                                            onClick = {
-                                                viewModel.saveUserNote(noteText)
-                                                focusManager.clearFocus()
-                                            },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = ZenPrimary,
-                                                contentColor = ZenOnPrimary
-                                            ),
-                                            shape = RoundedCornerShape(50),
-                                            modifier = Modifier
-                                                .align(Alignment.End)
-                                                .testTag("save_journal_button")
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Save,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp)
+                                            val wordCount = remember(noteText) {
+                                                if (noteText.isBlank()) 0 else noteText.trim().split("\\s+".toRegex()).size
+                                            }
+                                            Text(
+                                                text = "$wordCount words • ${noteText.length} chars",
+                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                    color = ZenSecondary.copy(alpha = 0.8f),
+                                                    fontSize = 12.sp
+                                                )
                                             )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Save Reflection", fontSize = 13.sp)
+
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                if (noteText.isNotBlank()) {
+                                                    OutlinedButton(
+                                                        onClick = {
+                                                            noteText = ""
+                                                            viewModel.saveUserNote("")
+                                                        },
+                                                        border = BorderStroke(1.dp, ZenBorder),
+                                                        shape = RoundedCornerShape(50),
+                                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                                    ) {
+                                                        Text("Clear", fontSize = 12.sp, color = ZenSecondary)
+                                                    }
+                                                }
+
+                                                Button(
+                                                    onClick = {
+                                                        viewModel.saveUserNote(noteText)
+                                                        focusManager.clearFocus()
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(
+                                                        containerColor = ZenPrimary,
+                                                        contentColor = ZenOnPrimary
+                                                    ),
+                                                    shape = RoundedCornerShape(50),
+                                                    modifier = Modifier.testTag("save_journal_button")
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Save,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text("Save Reflection", fontSize = 13.sp)
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1037,7 +1184,21 @@ fun HomeScreen(viewModel: TaoViewModel) {
             }
         }
 
-        // 5. Error Message Snackbar Alert
+        // 5. Slide-up Journal Log Sheet
+        if (showJournalSheet) {
+            JournalLogSheet(
+                journalEntries = journalEntries,
+                onDismiss = { showJournalSheet = false },
+                onSelectDay = { day ->
+                    viewModel.selectDay(day)
+                },
+                onUpdateNote = { med, note ->
+                    viewModel.saveNoteForDay(med, note)
+                }
+            )
+        }
+
+        // 6. Error Message Snackbar Alert
         if (errorMessage != null) {
             Snackbar(
                 action = {
@@ -1161,101 +1322,195 @@ fun RowScope.BackgroundOptionChip(
 
 @Composable
 fun RenderBackground(settings: UserSettings) {
+    val infiniteTransition = rememberInfiniteTransition(label = "bg_animations")
+
+    // Slow ambient zoom animation (1.0f -> 1.04f over 16s)
+    val bgScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(16000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "bgScale"
+    )
+
+    // Breathing rhythm scale for meditation atmosphere (4s inhale / 4s exhale)
+    val breathScale by infiniteTransition.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "breathScale"
+    )
+
+    // Breathing aura opacity oscillation
+    val auraAlpha by infiniteTransition.animateFloat(
+        initialValue = if (settings.isAmbientPlaying) 0.22f else 0.12f,
+        targetValue = if (settings.isAmbientPlaying) 0.38f else 0.24f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "auraAlpha"
+    )
+
     Box(modifier = Modifier.fillMaxSize()) {
-        when (settings.bgType) {
-            "SOLID" -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background)
-                )
-            }
-            "MISTY_MOUNTAINS" -> {
-                Image(
-                    painter = painterResource(id = R.drawable.img_bg_mountains_1782754451099),
-                    contentDescription = "Misty Mountains background",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.85f))
-                )
-            }
-            "BAMBOO_GROVE" -> {
-                Image(
-                    painter = painterResource(id = R.drawable.img_bg_bamboo_1782754464039),
-                    contentDescription = "Bamboo Grove background",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.85f))
-                )
-            }
-            "ZEN_GARDEN" -> {
-                Image(
-                    painter = painterResource(id = R.drawable.img_bg_zen_garden_1782756842302),
-                    contentDescription = "Zen Garden background",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.85f))
-                )
-            }
-            "MISTY_LAKE" -> {
-                Image(
-                    painter = painterResource(id = R.drawable.img_bg_misty_lake_1782756854903),
-                    contentDescription = "Misty Lake background",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.85f))
-                )
-            }
-            "COSMIC_HARMONY" -> {
-                Image(
-                    painter = painterResource(id = R.drawable.img_bg_cosmic_harmony_1782756868198),
-                    contentDescription = "Cosmic Harmony background",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background.copy(alpha = 0.85f))
-                )
-            }
-            "CUSTOM_IMAGE" -> {
-                if (!settings.customBgUri.isNullOrEmpty()) {
-                    AsyncImage(
-                        model = settings.customBgUri,
-                        contentDescription = "Custom visual background",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.7f))
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background)
-                    )
+        // 1. Smooth Crossfade Transition between visual theme backgrounds
+        Crossfade(
+            targetState = settings.bgType,
+            animationSpec = tween(1200),
+            label = "bgCrossfade"
+        ) { bgType ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (bgType) {
+                    "SOLID" -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background)
+                        )
+                    }
+                    "MISTY_MOUNTAINS" -> {
+                        Image(
+                            painter = painterResource(id = R.drawable.img_bg_mountains_1782754451099),
+                            contentDescription = "Misty Mountains background",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = bgScale
+                                    scaleY = bgScale
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.83f))
+                        )
+                    }
+                    "BAMBOO_GROVE" -> {
+                        Image(
+                            painter = painterResource(id = R.drawable.img_bg_bamboo_1782754464039),
+                            contentDescription = "Bamboo Grove background",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = bgScale
+                                    scaleY = bgScale
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.83f))
+                        )
+                    }
+                    "ZEN_GARDEN" -> {
+                        Image(
+                            painter = painterResource(id = R.drawable.img_bg_zen_garden_1782756842302),
+                            contentDescription = "Zen Garden background",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = bgScale
+                                    scaleY = bgScale
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.83f))
+                        )
+                    }
+                    "MISTY_LAKE" -> {
+                        Image(
+                            painter = painterResource(id = R.drawable.img_bg_misty_lake_1782756854903),
+                            contentDescription = "Misty Lake background",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = bgScale
+                                    scaleY = bgScale
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.83f))
+                        )
+                    }
+                    "COSMIC_HARMONY" -> {
+                        Image(
+                            painter = painterResource(id = R.drawable.img_bg_cosmic_harmony_1782756868198),
+                            contentDescription = "Cosmic Harmony background",
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = bgScale
+                                    scaleY = bgScale
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.83f))
+                        )
+                    }
+                    "CUSTOM_IMAGE" -> {
+                        if (!settings.customBgUri.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = settings.customBgUri,
+                                contentDescription = "Custom visual background",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        scaleX = bgScale
+                                        scaleY = bgScale
+                                    },
+                                contentScale = ContentScale.Crop
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.7f))
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.background)
+                            )
+                        }
+                    }
                 }
             }
+        }
+
+        // 2. Calming Organic Breathing Aura Overlay (Zen Radial Mist)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val centerOffset = Offset(size.width / 2f, size.height * 0.38f)
+            val maxRadius = size.width * 0.75f * breathScale
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        ZenPrimary.copy(alpha = auraAlpha),
+                        ZenSecondary.copy(alpha = auraAlpha * 0.4f),
+                        Color.Transparent
+                    ),
+                    center = centerOffset,
+                    radius = maxRadius
+                ),
+                center = centerOffset,
+                radius = maxRadius
+            )
         }
     }
 }
@@ -1357,6 +1612,251 @@ fun CycleCompletionTrackerCard(completedCount: Int) {
                             color = ZenPrimary,
                             fontWeight = FontWeight.Medium,
                             fontStyle = FontStyle.Italic
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun JournalLogSheet(
+    journalEntries: List<TaoMeditation>,
+    onDismiss: () -> Unit,
+    onSelectDay: (Int) -> Unit,
+    onUpdateNote: (TaoMeditation, String) -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredEntries = remember(journalEntries, searchQuery) {
+        if (searchQuery.isBlank()) {
+            journalEntries
+        } else {
+            journalEntries.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                it.userNote.contains(searchQuery, ignoreCase = true) ||
+                "Day ${it.day}".contains(searchQuery, ignoreCase = true)
+            }
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 20.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Personal Journal Log",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Serif,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                    Text(
+                        text = "${journalEntries.size} saved reflection${if (journalEntries.size != 1) "s" else ""}",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = ZenSecondary
+                        )
+                    )
+                }
+            }
+
+            if (journalEntries.isNotEmpty()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Search thoughts or days...", fontSize = 14.sp) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = ZenSecondary)
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Clear search", tint = ZenSecondary)
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                        .testTag("journal_search_input"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ZenPrimary,
+                        unfocusedBorderColor = ZenBorder
+                    )
+                )
+            }
+
+            if (filteredEntries.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.EditNote,
+                            contentDescription = null,
+                            tint = ZenSecondary.copy(alpha = 0.5f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = if (journalEntries.isEmpty())
+                                "Your journal is quiet like still waters.\nRead today's meditation and pen your first reflection."
+                            else "No reflections matched '$searchQuery'",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = ZenSecondary,
+                                fontStyle = FontStyle.Italic
+                            ),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxHeight(0.65f)
+                        .padding(bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(filteredEntries, key = { it.day }) { entry ->
+                        JournalEntryCard(
+                            entry = entry,
+                            onSelectDay = {
+                                onSelectDay(entry.day)
+                                onDismiss()
+                            },
+                            onDelete = {
+                                onUpdateNote(entry, "")
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun JournalEntryCard(
+    entry: TaoMeditation,
+    onSelectDay: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFF9F8F3)
+        ),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ZenBorder),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("journal_entry_card_${entry.day}")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = ZenActivePill,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = entry.formattedDay,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = Color(0xFF141F07)
+                            ),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = entry.title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Serif,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    )
+                }
+
+                IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = "Delete reflection",
+                        tint = Color(0xFFB00020).copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = entry.userNote,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontFamily = FontFamily.Serif,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                    lineHeight = 20.sp
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = onSelectDay,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MenuBook,
+                        contentDescription = null,
+                        tint = ZenPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Open Day ${entry.day} Meditation",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = ZenPrimary
                         )
                     )
                 }
