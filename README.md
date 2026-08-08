@@ -51,7 +51,9 @@ If you want help getting started, open an issue describing what you want to add 
 
 ## License
 
-This repository does not specify a license by default. If you want this content to be reusable, consider adding a license such as CC BY-SA 4.0 for text or an appropriate open license. To add a license, create a `LICENSE` file in the repository.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
+
+This repository is licensed under the GNU General Public License v3.0 or later (GPL-3.0-or-later). See the [LICENSE](LICENSE) file for the full text.
 
 ## Maintainer
 
