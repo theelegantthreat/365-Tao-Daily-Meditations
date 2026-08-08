@@ -2,6 +2,8 @@ Copyright (C) 2026 <theelegantthreat>
 
 # 365 Tao: Daily Meditations
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
+
 A daily collection of short meditations inspired by the Tao Te Ching and Taoist philosophy—one for each day of the year. This repository stores meditations, reflections, and small exercises intended for personal contemplation and mindful living.
 
 ## Table of Contents
