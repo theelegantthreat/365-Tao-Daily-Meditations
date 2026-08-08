@@ -1,5 +1,7 @@
 # 365 Tao — Daily Meditations
 
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.txt)
+
 Android app that provides short daily meditations and inspiration for Tao enthusiasts.
 
 ## Overview
@@ -45,9 +47,11 @@ Coding conventions
 
 ## License
 
-No license specified. If you want this project to be open source, add a LICENSE file (for example, MIT, Apache-2.0).
+This project is licensed under the GNU General Public License v3.0 or later (GPL-3.0-or-later).
+See the LICENSE file in the repository root for full license text and details.
+
+SPDX-License-Identifier: GPL-3.0-or-later
 
 ## Contact
 
 Owner: theelegantthreat — https://github.com/theelegantthreat
-
